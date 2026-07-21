@@ -1,0 +1,21 @@
+{
+    "full_name": "Maheswaren Manivannan",
+    "name": "Mahes",
+    "current_role": "Senior Software Engineer",
+    "location": "Berlin, Germany",
+    "email": "mahesvannan3107@gmail.com",
+    "linkedin": "https://www.linkedin.com/in/maheswaren-manivannan-8492b676/",
+    "specialties": [
+      "Backend Engineering (Java, Spring Boot, Microservices)",
+      "Cloud-Native Application Development",
+      "Agentic AI and AI Engineering"
+    ],
+    "years_experience": 10,
+    "education": [
+      {
+        "degree": "Bachelor's Degree",
+        "institution": "Anna University Chennai",
+        "year": "2014"
+      }
+    ]
+  }
