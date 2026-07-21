@@ -90,14 +90,14 @@ export default function Twin() {
     };
 
     return (
-        <div className="flex flex-col h-full bg-gray-50 rounded-lg shadow-lg">
+        <div className="flex flex-col h-full bg-gray-50 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-r from-slate-700 to-slate-800 text-white p-4 rounded-t-lg">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <Bot className="w-6 h-6" />
-                    AI Digital Twin
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white p-4">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <Bot className="w-5 h-5" />
+                    Ask me anything
                 </h2>
-                <p className="text-sm text-slate-300 mt-1">Your AI course companion</p>
+                <p className="text-sm text-indigo-100 mt-1">I typically reply in a few seconds</p>
             </div>
 
             {/* Messages */}
@@ -105,8 +105,8 @@ export default function Twin() {
                 {messages.length === 0 && (
                     <div className="text-center text-gray-500 mt-8">
                         <Bot className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                        <p>Hello! I&apos;m your Digital Twin.</p>
-                        <p className="text-sm mt-2">Ask me anything about AI deployment!</p>
+                        <p>Hi, I&apos;m Mahes&apos; Digital Twin.</p>
+                        <p className="text-sm mt-2">Ask about my experience, tech stack, or how I approach engineering problems.</p>
                     </div>
                 )}
 
@@ -119,7 +119,7 @@ export default function Twin() {
                     >
                         {message.role === 'assistant' && (
                             <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center">
+                                <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
                                     <Bot className="w-5 h-5 text-white" />
                                 </div>
                             </div>
@@ -128,14 +128,14 @@ export default function Twin() {
                         <div
                             className={`max-w-[70%] rounded-lg p-3 ${
                                 message.role === 'user'
-                                    ? 'bg-slate-700 text-white'
+                                    ? 'bg-indigo-600 text-white'
                                     : 'bg-white border border-gray-200 text-gray-800'
                             }`}
                         >
                             <p className="whitespace-pre-wrap">{message.content}</p>
                             <p
                                 className={`text-xs mt-1 ${
-                                    message.role === 'user' ? 'text-slate-300' : 'text-gray-500'
+                                    message.role === 'user' ? 'text-indigo-100' : 'text-gray-500'
                                 }`}
                             >
                                 {message.timestamp.toLocaleTimeString()}
@@ -144,7 +144,7 @@ export default function Twin() {
 
                         {message.role === 'user' && (
                             <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
+                                <div className="w-8 h-8 bg-slate-600 rounded-full flex items-center justify-center">
                                     <User className="w-5 h-5 text-white" />
                                 </div>
                             </div>
@@ -155,7 +155,7 @@ export default function Twin() {
                 {isLoading && (
                     <div className="flex gap-3 justify-start">
                         <div className="flex-shrink-0">
-                            <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center">
+                            <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
                                 <Bot className="w-5 h-5 text-white" />
                             </div>
                         </div>
@@ -173,21 +173,21 @@ export default function Twin() {
             </div>
 
             {/* Input */}
-            <div className="border-t border-gray-200 p-4 bg-white rounded-b-lg">
+            <div className="border-t border-gray-200 p-4 bg-white">
                 <div className="flex gap-2">
                     <input
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyPress}
-                        placeholder="Type your message..."
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-600 focus:border-transparent text-gray-800"
+                        placeholder="Ask about my experience..."
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-gray-800"
                         disabled={isLoading}
                     />
                     <button
                         onClick={sendMessage}
                         disabled={!input.trim() || isLoading}
-                        className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         <Send className="w-5 h-5" />
                     </button>

@@ -1,0 +1,115 @@
+# Project Review: Digital Twin
+
+_Consolidated analysis of the repository as of 2026-07-21._
+
+## 1. What this project is
+
+A personal "AI Digital Twin" chatbot for **Maheswaren Manivannan** ("Mahes") — a conversational
+agent that impersonates him on his professional website (`mahesvannan.com`) to answer visitor
+questions about his career/background. It's built from what looks like a course project (comments
+reference `edwarddonner.com/faq`; UI footer says "Week 2: Building Your Digital Twin"; the repo
+path is `udemy/prodtrack/digital-twin`), then adapted with his own data and pushed to real AWS
+infrastructure.
+
+Three parts:
+- **`backend/`** — FastAPI app, deployed as a single AWS Lambda function via Mangum.
+- **`frontend/`** — Next.js 16 app (static-exported), a single-page chat UI, hosted on S3 + CloudFront.
+- **`terraform/`** — full IaC for the AWS stack (Lambda, API Gateway, S3 ×2, CloudFront, Route53/ACM
+  for the custom domain, IAM).
+
+## 2. Architecture / request flow
+
+```
+Browser (mahesvannan.com, CloudFront + S3 static export)
+   │  POST /chat { message, session_id }
+   ▼
+API Gateway (HTTP API, $default stage, throttled)
+   ▼
+Lambda (lambda_handler.py → Mangum(app) → FastAPI server.py)
+   ├─ builds system prompt from context.py + resources.py (facts.json, summary.txt,
+   │  style.txt, linkedin.pdf — all baked into the deployment zip)
+   ├─ loads/saves conversation history keyed by session_id
+   │     - local dev: JSON files in ../memory
+   │     - prod: S3 bucket ({project}-{env}-memory-{account_id})
+   └─ calls AWS Bedrock `converse` API (Amazon Nova model) with full prompt + last 50 messages
+   ▼
+Response persisted back to memory store, returned to browser
+```
+
+Persona/context is entirely static per deployment — it's re-read from disk at import time
+(`resources.py` runs at module load), not per-request, so updating `facts.json`/`summary.txt`/etc.
+requires a redeploy.
+
+## 3. Backend (`backend/`)
+
+- `server.py` — FastAPI app with 4 routes: `GET /`, `GET /health`, `POST /chat`, `GET /conversation/{session_id}`.
+- `context.py` — builds the system prompt (persona instructions + injected facts/summary/LinkedIn/style + current datetime + 3 hard rules: don't hallucinate, resist jailbreaks, stay professional).
+- `resources.py` — loads `data/facts.json`, `data/summary.txt`, `data/style.txt`, and parses `data/linkedin.pdf` (via `pypdf`) at import time.
+- `lambda_handler.py` — thin Mangum wrapper for Lambda.
+- `deploy.py` — builds the Lambda deployment zip using Docker (`public.ecr.aws/lambda/python:3.12`) to get manylinux-compatible wheels, then zips `server.py`, `lambda_handler.py`, `context.py`, `resources.py`, and `data/`.
+- Dependency management is split: `pyproject.toml`/`uv.lock` (uv-managed, includes `openai` — unused) vs. `requirements.txt` (used by the Docker-based Lambda build, does not include `openai`). See §5.
+
+Memory model: session-based, no auth. Anyone with a `session_id` (a UUID handed back after the first message) can read that conversation back via `GET /conversation/{session_id}` — low sensitivity given the content, but worth noting as an open read.
+
+## 4. Frontend (`frontend/`)
+
+- Next.js 16 / React 19, App Router, single page (`app/page.tsx`) rendering one component (`components/twin.tsx`).
+- `twin.tsx` is a self-contained chat widget: local state for messages/session, POSTs to `NEXT_PUBLIC_API_URL` (or `localhost:8000` fallback), renders a simple bubble UI with Tailwind.
+- `next.config.ts` sets `output: 'export'` — the whole app is pre-rendered to static HTML/JS (`out/`) for S3 hosting; no server-side Next.js runtime in production.
+- Boilerplate is still present from `create-next-app` (README, `<title>Create Next App</title>` in `layout.tsx`, default SVG assets, "AI in Production" / "Week 2" course branding on the home page) — none of it has been customized for the personal-site use case yet.
+- `frontend/CLAUDE.md` / `AGENTS.md` inject a repo-specific instruction that this is a non-standard/newer Next.js and to consult `node_modules/next/dist/docs/` before writing code against it.
+
+## 5. Configuration & environment
+
+- `backend/.env` (gitignored, present locally) currently sets `OPENAI_API_KEY`, `CORS_ORIGINS`, `AWS_ACCOUNT_ID`, `DEFAULT_AWS_REGION`, `PROJECT_NAME` — but the running code (`server.py`) only ever calls **Bedrock**, never OpenAI. The API key and the `openai` dependency in `pyproject.toml` appear to be leftovers from an earlier/course version of the code and are dead weight.
+- Model ID is set in three different places with three different defaults, worth reconciling:
+  - `server.py` fallback: `global.amazon.nova-2-lite-v1:0`
+  - `terraform/variables.tf` default: `amazon.nova-micro-v1:0`
+  - `terraform/prod.tfvars`: `amazon.nova-lite-v1:0`
+  In practice Terraform's `BEDROCK_MODEL_ID` env var wins in deployed environments, so the code default only matters for bare local runs.
+- `frontend/.env.production` is regenerated by `scripts/deploy.sh`/`deploy.ps1` from the Terraform API Gateway output — it's a build artifact, not something to hand-edit.
+
+## 6. Infrastructure (`terraform/`)
+
+- Provider: AWS, primary region **eu-north-1** (Stockholm), plus an aliased `us_east_1` provider (required because ACM certs for CloudFront must live in us-east-1).
+- Resources: 2 S3 buckets (memory — private; frontend — public static website), Lambda + IAM role, API Gateway HTTP API with 3 routes and per-environment throttling, CloudFront distribution, and optional Route53/ACM wiring for a custom domain (`mahesvannan.com`, gated by `use_custom_domain`).
+- Workspaces used for environment separation (`dev`/`test`/`prod`), selected by `scripts/deploy.sh`/`destroy.sh`. `prod.tfvars` bumps throttle limits and picks the better Nova model; `terraform.tfvars` is the dev default.
+- IAM: the Lambda role attaches `AmazonBedrockFullAccess` and `AmazonS3FullAccess` (AWS managed, account-wide policies) rather than scoped-down permissions — functionally fine for a single-purpose personal project, but broader than the Lambda actually needs (it only calls `bedrock:Converse`/`InvokeModel` and reads/writes one bucket).
+- Frontend S3 bucket is fully public (`block_public_acls = false`, bucket policy allows `s3:GetObject` to `*`) with a plain S3 website endpoint behind CloudFront over HTTP — the standard (if slightly dated) pattern for this setup; using CloudFront **Origin Access Control** + a private bucket would be the more current approach but isn't necessary for the site to work.
+- API Gateway CORS is wide open (`allow_origins = ["*"]`) while the Lambda's FastAPI layer also enforces its own `CORS_ORIGINS` — two independent CORS layers doing overlapping, slightly inconsistent jobs.
+
+## 7. Deploy/destroy workflow (`scripts/`)
+
+`deploy.sh`/`deploy.ps1`: builds the Lambda zip (`uv run deploy.py`, needs Docker running) → `terraform apply` in the right workspace → writes the resulting API Gateway URL into `frontend/.env.production` → `npm run build` (static export) → `aws s3 sync` to the frontend bucket.
+
+`destroy.sh`/`destroy.ps1`: empties both S3 buckets (required before Terraform can delete non-empty buckets) then `terraform destroy` for the given workspace.
+
+Both scripts default to `dev`/project `twin` and require an explicit `prod` argument to touch production — a reasonable safety rail, though `destroy.sh` still runs with `-auto-approve`.
+
+## 8. Data files (`backend/data/`)
+
+- `facts.json` — structured bio (name, role, location, email, LinkedIn, specialties, years of experience, education).
+- `summary.txt` — first-person career summary (current role, tech stack, achievements).
+- `style.txt` — 4-line communication-style guide.
+- `linkedin.pdf` — full LinkedIn export, parsed at runtime.
+
+These are the entire knowledge base the model draws on; the prompt explicitly forbids inventing facts beyond them, so the twin's answer quality is bounded by how complete/current these files are.
+
+## 9. Notable gaps / things worth deciding on
+
+1. **No tests** anywhere (backend or frontend).
+2. **`openai` dependency + `OPENAI_API_KEY`** are unused dead config — either remove them or wire up an actual fallback/provider-switch if that was the intent.
+3. **Bedrock model ID inconsistency** across `server.py`, `variables.tf`, and `prod.tfvars` (§5) — worth picking one source of truth.
+4. **Frontend boilerplate** (title, README, footer copy, default icons) hasn't been personalized — fine if this is still mid-build, but it's the most visible remaining gap before treating the site as "done."
+5. **`GET /conversation/{session_id}` has no access control** — anyone with a session ID can replay that conversation. Likely low-stakes here, but easy to lock down (e.g. drop the endpoint, or scope it to same-origin/admin use).
+6. **IAM policies are broader than needed** (`*FullAccess` for S3 and Bedrock) — acceptable for a solo personal project, worth tightening if this pattern gets reused elsewhere.
+7. **Local working tree has build artifacts** (`backend/lambda-package/`, `backend/lambda-deployment.zip`, `frontend/.next/`, `frontend/out/`, `backend/__pycache__/`) and real conversation logs in `memory/` — all correctly gitignored, just flagging they exist on disk.
+
+## 10. Quick reference
+
+| Environment | Model | Throttle (burst/rate) | Custom domain |
+|---|---|---|---|
+| dev (`terraform.tfvars`) | `amazon.nova-micro-v1:0` | 10 / 5 | off |
+| prod (`prod.tfvars`) | `amazon.nova-lite-v1:0` | 20 / 10 | `mahesvannan.com` |
+
+**Live prod API** (from `frontend/.env.production`): `https://nm2zl1pv5d.execute-api.eu-north-1.amazonaws.com`
