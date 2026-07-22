@@ -1,13 +1,42 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User } from 'lucide-react';
+import Image from 'next/image';
+import { Send, User } from 'lucide-react';
+import { suggestedquestions } from '@/lib/profile';
+
+/** Circular photo avatar for the Digital Twin, with a subtle gradient ring. */
+function TwinAvatar({ size }: { size: number }) {
+    return (
+        <div
+            className="rounded-full bg-gradient-to-br from-violet-500 to-cyan-400 p-[1.5px] shadow-[0_0_16px_-4px_rgba(139,92,246,0.7)]"
+            style={{ width: size, height: size }}
+        >
+            <div className="relative h-full w-full overflow-hidden rounded-full bg-ink">
+                <Image src="/profile.png" alt="Mahes" fill sizes={`${size}px`} className="object-cover" />
+            </div>
+        </div>
+    );
+}
 
 interface Message {
     id: string;
     role: 'user' | 'assistant';
     content: string;
     timestamp: Date;
+}
+
+// Module-scope factory keeps the impure id/timestamp generation out of the
+// component render scope (React 19 react-hooks/purity rule).
+let messageCounterSeed = 0;
+function createMessage(role: Message['role'], content: string): Message {
+    messageCounterSeed += 1;
+    return {
+        id: `${role}-${messageCounterSeed}`,
+        role,
+        content,
+        timestamp: new Date(),
+    };
 }
 
 export default function Twin() {
@@ -25,15 +54,11 @@ export default function Twin() {
         scrollToBottom();
     }, [messages]);
 
-    const sendMessage = async () => {
-        if (!input.trim() || isLoading) return;
+    const sendMessage = async (text?: string) => {
+        const content = (text ?? input).trim();
+        if (!content || isLoading) return;
 
-        const userMessage: Message = {
-            id: Date.now().toString(),
-            role: 'user',
-            content: input,
-            timestamp: new Date(),
-        };
+        const userMessage = createMessage('user', content);
 
         setMessages(prev => [...prev, userMessage]);
         setInput('');
@@ -46,7 +71,7 @@ export default function Twin() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    message: input,
+                    message: content,
                     session_id: sessionId || undefined,
                 }),
             });
@@ -59,23 +84,16 @@ export default function Twin() {
                 setSessionId(data.session_id);
             }
 
-            const assistantMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: data.response,
-                timestamp: new Date(),
-            };
+            const assistantMessage = createMessage('assistant', data.response);
 
             setMessages(prev => [...prev, assistantMessage]);
         } catch (error) {
             console.error('Error:', error);
             // Add error message
-            const errorMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: 'Sorry, I encountered an error. Please try again.',
-                timestamp: new Date(),
-            };
+            const errorMessage = createMessage(
+                'assistant',
+                'Sorry, I encountered an error. Please try again.'
+            );
             setMessages(prev => [...prev, errorMessage]);
         } finally {
             setIsLoading(false);
@@ -90,23 +108,41 @@ export default function Twin() {
     };
 
     return (
-        <div className="flex flex-col h-full bg-gray-50 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="glass flex h-full flex-col overflow-hidden rounded-3xl shadow-[0_0_60px_-20px_rgba(139,92,246,0.4)]">
             {/* Header */}
-            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white p-4">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <Bot className="w-5 h-5" />
-                    Ask me anything
-                </h2>
-                <p className="text-sm text-indigo-100 mt-1">I typically reply in a few seconds</p>
+            <div className="flex items-center gap-3 border-b border-hairline bg-gradient-to-r from-violet-600/25 to-cyan-500/15 p-5">
+                <TwinAvatar size={40} />
+                <div>
+                    <h2 className="text-base font-semibold text-white">Mahes&apos; Digital Twin</h2>
+                    <p className="flex items-center gap-1.5 text-xs text-zinc-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_2px_rgba(52,211,153,0.6)]" />
+                        Online · replies in a few seconds
+                    </p>
+                </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 space-y-4 overflow-y-auto p-5">
                 {messages.length === 0 && (
-                    <div className="text-center text-gray-500 mt-8">
-                        <Bot className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                        <p>Hi, I&apos;m Mahes&apos; Digital Twin.</p>
-                        <p className="text-sm mt-2">Ask about my experience, tech stack, or how I approach engineering problems.</p>
+                    <div className="flex h-full flex-col items-center justify-center text-center">
+                        <div className="mb-4">
+                            <TwinAvatar size={64} />
+                        </div>
+                        <p className="font-medium text-zinc-200">Hi, I&apos;m Mahes&apos; Digital Twin.</p>
+                        <p className="mt-2 max-w-sm text-sm text-zinc-500">
+                            Ask about my AI work, backend experience, or how I approach engineering.
+                        </p>
+                        <div className="mt-6 flex flex-wrap justify-center gap-2">
+                            {suggestedquestions.map((q) => (
+                                <button
+                                    key={q}
+                                    onClick={() => sendMessage(q)}
+                                    className="rounded-full border border-hairline bg-glass px-3.5 py-1.5 text-xs text-zinc-300 transition-colors hover:border-violet-400/50 hover:text-white"
+                                >
+                                    {q}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
 
@@ -119,23 +155,21 @@ export default function Twin() {
                     >
                         {message.role === 'assistant' && (
                             <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
-                                    <Bot className="w-5 h-5 text-white" />
-                                </div>
+                                <TwinAvatar size={32} />
                             </div>
                         )}
 
                         <div
-                            className={`max-w-[70%] rounded-lg p-3 ${
+                            className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm ${
                                 message.role === 'user'
-                                    ? 'bg-indigo-600 text-white'
-                                    : 'bg-white border border-gray-200 text-gray-800'
+                                    ? 'bg-gradient-to-br from-violet-500 to-indigo-500 text-white'
+                                    : 'glass text-zinc-100'
                             }`}
                         >
-                            <p className="whitespace-pre-wrap">{message.content}</p>
+                            <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
                             <p
-                                className={`text-xs mt-1 ${
-                                    message.role === 'user' ? 'text-indigo-100' : 'text-gray-500'
+                                className={`mt-1.5 text-[11px] ${
+                                    message.role === 'user' ? 'text-violet-100/80' : 'text-zinc-500'
                                 }`}
                             >
                                 {message.timestamp.toLocaleTimeString()}
@@ -144,8 +178,8 @@ export default function Twin() {
 
                         {message.role === 'user' && (
                             <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-slate-600 rounded-full flex items-center justify-center">
-                                    <User className="w-5 h-5 text-white" />
+                                <div className="flex h-8 w-8 items-center justify-center rounded-full border border-hairline bg-glass text-zinc-300">
+                                    <User className="h-4 w-4" />
                                 </div>
                             </div>
                         )}
@@ -153,17 +187,15 @@ export default function Twin() {
                 ))}
 
                 {isLoading && (
-                    <div className="flex gap-3 justify-start">
+                    <div className="flex justify-start gap-3">
                         <div className="flex-shrink-0">
-                            <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
-                                <Bot className="w-5 h-5 text-white" />
-                            </div>
+                            <TwinAvatar size={32} />
                         </div>
-                        <div className="bg-white border border-gray-200 rounded-lg p-3">
-                            <div className="flex space-x-2">
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+                        <div className="glass rounded-2xl px-4 py-3">
+                            <div className="flex gap-1.5">
+                                <div className="h-2 w-2 rounded-full bg-violet-400 animate-bounce" />
+                                <div className="h-2 w-2 rounded-full bg-violet-400 animate-bounce delay-100" />
+                                <div className="h-2 w-2 rounded-full bg-cyan-400 animate-bounce delay-200" />
                             </div>
                         </div>
                     </div>
@@ -173,7 +205,7 @@ export default function Twin() {
             </div>
 
             {/* Input */}
-            <div className="border-t border-gray-200 p-4 bg-white">
+            <div className="border-t border-hairline p-4">
                 <div className="flex gap-2">
                     <input
                         type="text"
@@ -181,15 +213,15 @@ export default function Twin() {
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyPress}
                         placeholder="Ask about my experience..."
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent text-gray-800"
+                        className="flex-1 rounded-xl border border-hairline bg-glass px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 transition-shadow focus:border-violet-400/50 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
                         disabled={isLoading}
                     />
                     <button
-                        onClick={sendMessage}
+                        onClick={() => sendMessage()}
                         disabled={!input.trim() || isLoading}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="flex items-center justify-center rounded-xl bg-gradient-to-r from-violet-500 to-cyan-400 px-4 text-ink transition-transform hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                        <Send className="w-5 h-5" />
+                        <Send className="h-5 w-5" />
                     </button>
                 </div>
             </div>

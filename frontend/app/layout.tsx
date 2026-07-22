@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Maheswaren Manivannan — Senior Software Engineer",
+  title: "Maheswaren Manivannan — AI Engineer",
   description:
-    "Personal site and AI Digital Twin of Maheswaren Manivannan, a Senior Software Engineer specializing in backend engineering, cloud-native systems, and agentic AI.",
+    "Personal site and AI Digital Twin of Maheswaren Manivannan — a Senior Software Engineer with 10+ years of backend experience, now building production AI: LLM engineering, RAG, and agentic AI.",
 };
 
 export default function RootLayout({
@@ -28,7 +28,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full scroll-smooth antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col bg-ink text-zinc-200">{children}</body>
     </html>
   );
 }
