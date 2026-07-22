@@ -4,7 +4,7 @@ import { profile, specialties, heroHeadline, heroSummary } from '@/lib/profile';
 
 export default function Hero() {
   return (
-    <section id="top" className="relative overflow-hidden px-4 pt-28 pb-28">
+    <section id="top" className="relative overflow-hidden px-4 pt-20 pb-16">
       <div className="aurora" />
       <div className="grid-texture" />
 

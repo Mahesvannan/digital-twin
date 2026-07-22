@@ -46,12 +46,13 @@ export default function Twin() {
     const [sessionId, setSessionId] = useState<string>('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
-
     useEffect(() => {
-        scrollToBottom();
+        // Don't scroll on first render: the conversation is empty, and
+        // scrollIntoView would drag the whole page down to the chat widget
+        // as soon as the site loads. `block: 'nearest'` then keeps later
+        // auto-scrolling inside the message list instead of moving the page.
+        if (messages.length === 0) return;
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, [messages]);
 
     const sendMessage = async (text?: string) => {
