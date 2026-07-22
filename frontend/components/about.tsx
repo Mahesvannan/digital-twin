@@ -3,7 +3,7 @@ import { profile, workingStyle } from '@/lib/profile';
 
 export default function About() {
   return (
-    <section id="about" className="px-4 py-24">
+    <section id="about" className="px-4 py-14 sm:py-16">
       <div className="container mx-auto max-w-5xl">
         <Reveal>
           <div className="grid gap-12 md:grid-cols-5">

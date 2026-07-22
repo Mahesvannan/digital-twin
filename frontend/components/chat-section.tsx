@@ -3,7 +3,7 @@ import Reveal from '@/components/reveal';
 
 export default function ChatSection() {
   return (
-    <section id="chat" className="relative overflow-hidden px-4 py-24">
+    <section id="chat" className="relative overflow-hidden px-4 py-14 sm:py-16">
       <div className="aurora !opacity-30" />
       <div className="container relative z-10 mx-auto max-w-3xl">
         <Reveal>

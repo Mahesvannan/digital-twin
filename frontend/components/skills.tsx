@@ -4,7 +4,7 @@ import { aiSkills, techStack } from '@/lib/profile';
 
 export default function Skills() {
   return (
-    <section id="skills" className="relative px-4 py-24">
+    <section id="skills" className="relative px-4 py-14 sm:py-16">
       <div className="container mx-auto max-w-5xl">
         <Reveal>
           <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400">
