@@ -31,6 +31,7 @@ if ($Environment -eq "prod") {
 
 $ApiUrl        = terraform output -raw api_gateway_url
 $FrontendBucket = terraform output -raw s3_frontend_bucket
+$DistributionId = terraform output -raw cloudfront_distribution_id
 try { $CustomUrl = terraform output -raw custom_domain_url } catch { $CustomUrl = "" }
 
 # 3. Build + deploy frontend
@@ -44,6 +45,21 @@ npm install
 npm run build
 aws s3 sync .\out "s3://$FrontendBucket/" --delete
 Set-Location ..
+
+# 3b. Invalidate the CloudFront cache.
+# Without this, edge locations keep serving the previous build until the
+# distribution's TTL expires (default_ttl is 3600s), so a successful deploy
+# appears to "not reflect" for up to an hour.
+Write-Host "Invalidating CloudFront cache..." -ForegroundColor Yellow
+$InvalidationId = aws cloudfront create-invalidation `
+    --distribution-id $DistributionId `
+    --paths "/*" `
+    --query "Invalidation.Id" --output text
+Write-Host "Waiting for invalidation $InvalidationId to complete..." -ForegroundColor Yellow
+aws cloudfront wait invalidation-completed `
+    --distribution-id $DistributionId `
+    --id $InvalidationId
+Write-Host "CloudFront cache invalidated." -ForegroundColor Green
 
 # 4. Final summary
 $CfUrl = terraform -chdir=terraform output -raw cloudfront_url
